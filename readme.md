@@ -46,6 +46,7 @@ Erstelle im Projektverzeichnis eine `.env`-Datei, um Umgebungsvariablen (wie z. 
 GATEWAY_IP=DEINE_IP
 GATEWAY_PORT=502
 PORT=3000
+RETENTION_HOURS=24
 ```
 
 ### 3. Docker Container Starten

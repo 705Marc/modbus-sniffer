@@ -3,6 +3,7 @@ const http = require("http");
 const express = require("express");
 const { Server } = require("socket.io");
 const net = require("net");
+const Database = require("better-sqlite3");
 require("dotenv").config();
 
 const app = express();
@@ -12,14 +13,78 @@ const io = new Server(server);
 const GATEWAY_IP = process.env.GATEWAY_IP || "10.10.20.77";
 const GATEWAY_PORT = parseInt(process.env.GATEWAY_PORT, 10) || 502;
 const PORT = parseInt(process.env.PORT, 10) || 3000;
+// Speicherzeit in Stunden aus .env (Standard: 24 Stunden, wenn nicht angegeben)
+const RETENTION_HOURS = parseInt(process.env.RETENTION_HOURS, 10) || 24;
 
 app.use(express.static(path.join(__dirname, "public")));
 
-let transactions = [];
-let errors = []; // 24/7 Schutz: Fehler-Array für den Fehler-Monitor
+// --- SQLite Datenbank initialisieren ---
+const db = new Database(path.join(__dirname, "modbus_sniffer.db"));
+
+// Tabellen erstellen, falls sie noch nicht existieren
+db.exec(`
+  CREATE TABLE IF NOT EXISTS transactions (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT,
+    slaveId INTEGER,
+    funcCode INTEGER,
+    funcName TEXT,
+    type TEXT,
+    startReg TEXT,
+    countOrVal TEXT,
+    requestRaw TEXT,
+    responseRaw TEXT,
+    decodedValues TEXT,
+    status TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS registers (
+    regKey TEXT PRIMARY KEY,
+    slaveId INTEGER,
+    regNum INTEGER,
+    raw INTEGER,
+    signed INTEGER,
+    uint32_ABCD INTEGER,
+    float_ABCD REAL,
+    timestamp TEXT,
+    funcCode INTEGER,
+    type TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
+    slaveId TEXT,
+    errorType TEXT,
+    details TEXT
+  );
+`);
+
+// Prepared Statements für maximale Performance
+const insertTransactionStmt = db.prepare(`
+  INSERT OR REPLACE INTO transactions (id, timestamp, slaveId, funcCode, funcName, type, startReg, countOrVal, requestRaw, responseRaw, decodedValues, status)
+  VALUES (@id, @timestamp, @slaveId, @funcCode, @funcName, @type, @startReg, @countOrVal, @requestRaw, @responseRaw, @decodedValues, @status)
+`);
+
+const insertRegisterStmt = db.prepare(`
+  INSERT OR REPLACE INTO registers (regKey, slaveId, regNum, raw, signed, uint32_ABCD, float_ABCD, timestamp, funcCode, type)
+  VALUES (@regKey, @slaveId, @regNum, @raw, @signed, @uint32_ABCD, @float_ABCD, @timestamp, @funcCode, @type)
+`);
+
+const insertErrorStmt = db.prepare(`
+  INSERT INTO errors (timestamp, slaveId, errorType, details)
+  VALUES (@timestamp, @slaveId, @errorType, @details)
+`);
+
+const clearDbStmt = db.transaction(() => {
+  db.prepare("DELETE FROM transactions").run();
+  db.prepare("DELETE FROM registers").run();
+  db.prepare("DELETE FROM errors").run();
+});
+// ----------------------------------------
+
 let pendingRequests = new Map();
-let activeRegisters = new Map();
-const MAX_ACTIVE_REGISTERS = 2000; // 24/7 Schutz: Begrenzung der maximal gespeicherten Register im RAM
+const MAX_ACTIVE_REGISTERS = 2000; // 24/7 Schutz: Begrenzung
 
 let clientSocket = null;
 let buffer = Buffer.alloc(0);
@@ -53,23 +118,20 @@ const functionNames = {
   16: "Write Multiple Registers",
 };
 
-// Hilfsfunktion zur sicheren Begrenzung von Maps im 24/7 Betrieb
-function setSafeRegister(key, value) {
-  if (
-    activeRegisters.size >= MAX_ACTIVE_REGISTERS &&
-    !activeRegisters.has(key)
-  ) {
-    // Lösche den ältesten Eintrag (das erste Element der Map)
-    const oldestKey = activeRegisters.keys().next().value;
-    activeRegisters.delete(oldestKey);
+// Hilfsfunktion zur sicheren Begrenzung von Registern in SQLite
+function setSafeRegister(regKey, data) {
+  const countRow = db.prepare("SELECT COUNT(*) as count FROM registers").get();
+  if (countRow.count >= MAX_ACTIVE_REGISTERS) {
+    db.prepare(
+      "DELETE FROM registers WHERE regKey = (SELECT regKey FROM registers ORDER BY timestamp ASC LIMIT 1)",
+    ).run();
   }
-  activeRegisters.set(key, value);
+  insertRegisterStmt.run({ regKey, ...data });
 }
 
 function parseRtuFrames(chunk) {
   buffer = Buffer.concat([buffer, chunk]);
 
-  // Schutz vor unendlichem Aufwachsen des rohen Byte-Buffers bei Bus-Störungen
   if (buffer.length > 2048) {
     buffer = buffer.slice(buffer.length - 1024);
   }
@@ -117,14 +179,17 @@ function parseRtuFrames(chunk) {
       if (checkCRC(frame)) {
         processValidFrame(slaveId, funcCode, frame);
       } else {
-        // CRC-Fehler protokollieren für den Fehler-Monitor
-        errors.push({
+        const errData = {
           timestamp: new Date().toISOString(),
-          slaveId,
+          slaveId: String(slaveId),
           errorType: "CRC-Fehler",
           details: frame.toString("hex").toUpperCase(),
-        });
-        if (errors.length > 100) errors.shift();
+        };
+        insertErrorStmt.run(errData);
+        // Begrenze Fehlertabelle auf max 100 Einträge
+        db.prepare(
+          "DELETE FROM errors WHERE id NOT IN (SELECT id FROM errors ORDER BY id DESC LIMIT 100)",
+        ).run();
       }
     } else {
       break;
@@ -157,6 +222,8 @@ function processValidFrame(slaveId, funcCode, frame) {
         regNum: startReg,
         raw: countOrVal,
         signed: countOrVal > 32767 ? countOrVal - 65536 : countOrVal,
+        uint32_ABCD: null,
+        float_ABCD: null,
         timestamp,
         funcCode,
         type: "Write Single",
@@ -164,21 +231,21 @@ function processValidFrame(slaveId, funcCode, frame) {
     }
 
     const tx = {
-      id: Date.now() + Math.random(),
+      id: String(Date.now() + Math.random()),
       timestamp,
       slaveId,
       funcCode,
       funcName,
       type: "Request",
-      startReg,
-      countOrVal,
+      startReg: String(startReg),
+      countOrVal: String(countOrVal),
       requestRaw: frame.toString("hex").toUpperCase(),
-      responseValues: "Warte auf Antwort...",
+      responseRaw: "Warte auf Antwort...",
+      decodedValues: JSON.stringify([]),
       status: "pending",
     };
 
-    transactions.unshift(tx);
-    if (transactions.length > 100) transactions.pop(); // Max 100 Transaktionen
+    insertTransactionStmt.run(tx);
 
     pendingRequests.set(`${slaveId}-${funcCode}`, tx);
     broadcastUpdate();
@@ -187,7 +254,7 @@ function processValidFrame(slaveId, funcCode, frame) {
     let tx = pendingRequests.get(pendingKey);
 
     let decodedValues = [];
-    let startReg = tx ? tx.startReg : 0;
+    let startReg = tx ? parseInt(tx.startReg, 10) : 0;
 
     if ([1, 2, 3, 4].includes(funcCode) && frame.length >= 5) {
       const byteCount = frame[2];
@@ -224,11 +291,13 @@ function processValidFrame(slaveId, funcCode, frame) {
 
           decodedValues.push(decVal);
 
-          // Sicherer Eintrag in die Register-Map mit Größenlimit
           setSafeRegister(`${slaveId}-${currentReg}`, {
             slaveId,
             regNum: currentReg,
-            ...decVal,
+            raw: decVal.raw,
+            signed: decVal.signed,
+            uint32_ABCD: decVal.uint32_ABCD,
+            float_ABCD: decVal.float_ABCD,
             timestamp,
             funcCode,
             type: "Read",
@@ -239,12 +308,13 @@ function processValidFrame(slaveId, funcCode, frame) {
 
     if (tx) {
       tx.responseRaw = frame.toString("hex").toUpperCase();
-      tx.decodedValues = decodedValues;
+      tx.decodedValues = JSON.stringify(decodedValues);
       tx.status = "completed";
+      insertTransactionStmt.run(tx);
       pendingRequests.delete(pendingKey);
     } else {
-      transactions.unshift({
-        id: Date.now() + Math.random(),
+      const newTx = {
+        id: String(Date.now() + Math.random()),
         timestamp,
         slaveId,
         funcCode,
@@ -254,19 +324,54 @@ function processValidFrame(slaveId, funcCode, frame) {
         countOrVal: "?",
         requestRaw: "-",
         responseRaw: frame.toString("hex").toUpperCase(),
-        decodedValues: decodedValues,
+        decodedValues: JSON.stringify(decodedValues),
         status: "completed",
-      });
-      if (transactions.length > 100) transactions.pop();
+      };
+      insertTransactionStmt.run(newTx);
     }
 
     broadcastUpdate();
   }
 }
 
+// Hilfsfunktion: Löscht Transaktionen und Fehler, die älter sind als RETENTION_HOURS
+function cleanupDatabase() {
+  const cutoffTime = new Date(
+    Date.now() - RETENTION_HOURS * 3600 * 1000,
+  ).toISOString();
+
+  db.prepare(`DELETE FROM transactions WHERE timestamp < ?`).run(cutoffTime);
+  db.prepare(`DELETE FROM errors WHERE timestamp < ?`).run(cutoffTime);
+}
+
+function getDatabaseData() {
+  const transactions = db
+    .prepare("SELECT * FROM transactions ORDER BY timestamp DESC LIMIT 100")
+    .all()
+    .map((tx) => ({
+      ...tx,
+      decodedValues: tryParseJSON(tx.decodedValues),
+    }));
+
+  const registers = db.prepare("SELECT * FROM registers").all();
+  const errors = db
+    .prepare("SELECT * FROM errors ORDER BY timestamp DESC LIMIT 100")
+    .all();
+
+  return { transactions, registers, errors };
+}
+
+function tryParseJSON(str) {
+  try {
+    return JSON.parse(str);
+  } catch (e) {
+    return [];
+  }
+}
+
 function broadcastUpdate() {
-  const registersArray = Array.from(activeRegisters.values());
-  io.emit("updateData", { transactions, registers: registersArray, errors });
+  const data = getDatabaseData();
+  io.emit("updateData", data);
 }
 
 function connectGateway() {
@@ -289,34 +394,35 @@ function connectGateway() {
 
   clientSocket.on("error", (err) => {
     console.error("❌ Socket Fehler:", err.message);
-    errors.push({
+    insertErrorStmt.run({
       timestamp: new Date().toISOString(),
       slaveId: "-",
       errorType: "Socket-Fehler",
       details: err.message,
     });
-    if (errors.length > 100) errors.shift();
+    db.prepare(
+      "DELETE FROM errors WHERE id NOT IN (SELECT id FROM errors ORDER BY id DESC LIMIT 100)",
+    ).run();
     clientSocket.destroy();
   });
 }
 
 io.on("connection", (socket) => {
-  socket.emit("updateData", {
-    transactions,
-    registers: Array.from(activeRegisters.values()),
-    errors,
-  });
+  socket.emit("updateData", getDatabaseData());
 
   socket.on("clear", () => {
-    transactions = [];
-    errors = [];
+    clearDbStmt();
     pendingRequests.clear();
-    activeRegisters.clear();
     broadcastUpdate();
   });
 });
 
 server.listen(PORT, () => {
   console.log(`🚀 Modbus Sniffer läuft unter: http://localhost:${PORT}`);
+
+  // Beim Start einmalig aufräumen und dann alle 15 Minuten im Hintergrund
+  cleanupDatabase();
+  setInterval(cleanupDatabase, 15 * 60 * 1000);
+
   connectGateway();
 });

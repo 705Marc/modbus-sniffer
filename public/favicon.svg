@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Hintergrund -->
+  <rect width="64" height="64" rx="14" fill="#2563eb"/>
+  
+  <!-- IC / Chip-Körper -->
+  <rect x="16" y="16" width="32" height="32" rx="6" fill="#1e293b"/>
+  
+  <!-- Pins Links -->
+  <rect x="10" y="22" width="6" height="4" rx="1" fill="#93c5fd"/>
+  <rect x="10" y="30" width="6" height="4" rx="1" fill="#93c5fd"/>
+  <rect x="10" y="38" width="6" height="4" rx="1" fill="#93c5fd"/>
+  
+  <!-- Pins Rechts -->
+  <rect x="48" y="22" width="6" height="4" rx="1" fill="#93c5fd"/>
+  <rect x="48" y="30" width="6" height="4" rx="1" fill="#93c5fd"/>
+  <rect x="48" y="38" width="6" height="4" rx="1" fill="#93c5fd"/>
+
+  <!-- Aktivitäts-Punkt / LED (Grün für Live/OK) -->
+  <circle cx="32" cy="32" r="6" fill="#22c55e"/>
+  <circle cx="32" cy="32" r="3" fill="#dcfce7"/>
+</svg>

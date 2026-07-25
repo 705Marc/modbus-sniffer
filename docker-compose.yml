@@ -1,0 +1,10 @@
+services:
+  modbus-monitor:
+    build: .
+    container_name: modbus-monitor
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  modbus_data:

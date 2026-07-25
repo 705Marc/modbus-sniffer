@@ -1,8 +1,15 @@
-FROM node:20-alpine
+FROM node:22-alpine
+
+# Install build dependencies required for native modules like better-sqlite3
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
+
 COPY package*.json ./
+
 RUN npm ci --only=production
-COPY server.js ./
-COPY public/ ./public/
+
+COPY . .
+
 EXPOSE 3000
 CMD ["npm", "start"]

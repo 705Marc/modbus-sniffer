@@ -2,1171 +2,533 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Modbus RTU Bus-Monitor & Matrix</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <!-- Chart.js CDN für die Live-Trend-Ansicht -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Modbus RTU Sniffer</title>
+    <link rel="shortcut icon" href="favicon.svg" type="image/x-icon" />
     <style>
       body {
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        background-color: #f4f7f6;
+        font-family: sans-serif;
+        background: #f4f4f9;
         margin: 0;
         padding: 20px;
         color: #333;
       }
-      .container {
-        max-width: 1500px;
-        margin: 0 auto;
-        background: #fff;
-        padding: 20px;
-        border-radius: 8px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      }
-      header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border-bottom: 2px solid #eaeaea;
-        padding-bottom: 10px;
-        margin-bottom: 20px;
-      }
-      h1 {
-        margin: 0;
-        font-size: 22px;
+      h1,
+      h2 {
         color: #2c3e50;
       }
-      .nav-tabs {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 15px;
-        flex-wrap: wrap;
+      .card {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 20px;
       }
-      .tab-btn {
-        background: #e2e8f0;
-        border: none;
-        padding: 7px 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        color: #475569;
-        font-size: 12px;
-      }
-      .tab-btn.active {
-        background: #2563eb;
-        color: white;
-      }
-      .btn {
-        background-color: #27ae60;
-        color: white;
-        border: none;
-        padding: 8px 14px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-weight: bold;
-        font-size: 13px;
-      }
-      .btn:hover {
-        background-color: #219653;
-      }
-      .btn-clear {
-        background-color: #e74c3c;
-        margin-right: 10px;
-      }
-      .btn-clear:hover {
-        background-color: #c0392b;
-      }
-
-      .view-section {
-        display: none;
-      }
-      .view-section.active {
-        display: block;
-      }
-
       table {
         width: 100%;
         border-collapse: collapse;
         margin-top: 10px;
-        font-size: 13px;
       }
       th,
       td {
-        padding: 10px;
+        padding: 8px 10px;
         text-align: left;
         border-bottom: 1px solid #ddd;
-        vertical-align: top;
+        font-size: 0.85em;
       }
       th {
-        background-color: #f8f9fa;
-        color: #2c3e50;
+        background: #2c3e50;
+        color: white;
       }
-      tr:hover {
-        background-color: #f9f9f9;
+      button {
+        padding: 8px 14px;
+        border-radius: 4px;
+        cursor: pointer;
+        border: none;
+        font-weight: bold;
+        font-size: 0.9em;
       }
-      code {
-        font-family: monospace;
-        background: #eee;
-        padding: 2px 4px;
-        border-radius: 3px;
-        font-size: 12px;
+      .btn-start {
+        background: #27ae60;
+        color: white;
       }
-
-      .badge {
+      .btn-stop {
+        background: #e74c3c;
+        color: white;
+      }
+      .btn-clear {
+        background: #7f8c8d;
+        color: white;
+      }
+      .btn-backup {
+        background: #2980b9;
+        color: white;
+      }
+      .btn-edit {
+        background: #2980b9;
+        color: white;
+        padding: 4px 8px;
+        font-size: 0.8em;
+      }
+      .status-box {
         display: inline-block;
-        padding: 3px 8px;
+        padding: 6px 12px;
         border-radius: 4px;
-        font-size: 11px;
         font-weight: bold;
-        color: white;
+        font-size: 0.85em;
+        margin-bottom: 10px;
       }
-      .badge-fc3 {
-        background-color: #3498db;
+      .status-online {
+        background: #d4edda;
+        color: #155724;
       }
-      .badge-write {
-        background-color: #d97706;
+      .status-offline {
+        background: #f8d7da;
+        color: #721c24;
       }
-      .badge-read {
-        background-color: #0284c7;
-      }
-      .badge-error {
-        background-color: #dc2626;
-      }
-      .badge-ok {
-        background-color: #16a34a;
-      }
-
-      .register-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 6px;
-        margin-top: 5px;
-      }
-      .register-box {
-        background: #f8f9fa;
-        border: 1px solid #cbd5e1;
-        padding: 6px 8px;
+      .log-box {
+        background: #1e1e1e;
+        color: #00ff00;
+        padding: 10px;
+        font-family: monospace;
         border-radius: 4px;
-        font-size: 12px;
-      }
-      .register-box .reg-num {
-        color: #1e293b;
-        font-weight: bold;
-        font-size: 11px;
-        display: block;
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 2px;
-        margin-bottom: 3px;
-      }
-      .register-box .val-row {
-        font-size: 11px;
-        color: #475569;
-        margin-top: 2px;
-      }
-      .register-box .val-highlight {
-        font-weight: bold;
-        color: #0284c7;
-      }
-
-      .info-box {
-        background: #e8f4fd;
-        border-left: 4px solid #3498db;
-        padding: 10px 15px;
-        margin-bottom: 15px;
-        font-size: 13px;
-        border-radius: 0 4px 4px 0;
-      }
-
-      .controls-bar {
-        margin-bottom: 15px;
-        display: flex;
-        gap: 15px;
-        align-items: center;
-        flex-wrap: wrap;
-      }
-      .controls-bar select,
-      .controls-bar input,
-      .controls-bar textarea {
-        padding: 5px 8px;
-        border-radius: 4px;
-        border: 1px solid #cbd5e1;
-        background: #fff;
-        font-size: 13px;
-      }
-
-      /* Grid Cards für Geräte & Statistik */
-      .card-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-        gap: 15px;
-        margin-top: 10px;
-      }
-      .dashboard-card {
-        background: #f8fafc;
-        border: 1px solid #cbd5e1;
-        border-radius: 6px;
-        padding: 15px;
-      }
-      .dashboard-card h3 {
-        margin: 0 0 10px 0;
-        font-size: 16px;
-        color: #1e293b;
-        border-bottom: 1px solid #e2e8f0;
-        padding-bottom: 5px;
-      }
-
-      /* Register Matrix Grid Styling */
-      .matrix-container {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
-        gap: 6px;
-        max-height: 600px;
+        height: 220px;
         overflow-y: auto;
-        padding: 5px;
-        background: #f8fafc;
-        border: 1px solid #e2e8f0;
-        border-radius: 6px;
+        font-size: 0.8em;
+        line-height: 1.4;
       }
-      .matrix-cell {
-        background: #ffffff;
-        border: 1px solid #cbd5e1;
+      .write-badge {
+        background: #eef2f7;
+        padding: 2px 6px;
         border-radius: 4px;
-        padding: 6px;
-        text-align: center;
-        font-size: 12px;
-        position: relative;
+        display: inline-block;
+        margin: 2px 2px 2px 0;
+        border: 1px solid #dcdde1;
+      }
+
+      /* Modal Styles */
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+      }
+      .modal-content {
+        background-color: white;
+        margin: 5% auto;
+        padding: 20px;
+        border-radius: 8px;
+        width: 550px;
+        max-height: 85vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      }
+      .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
         cursor: pointer;
       }
-      .matrix-cell:hover {
-        border-color: #3b82f6;
-        z-index: 50;
+      .close:hover {
+        color: black;
       }
-      .matrix-cell.active {
-        background: #dcfce7;
-        border-color: #22c55e;
-        color: #14532d;
-        font-weight: bold;
+      .form-group {
+        margin-bottom: 12px;
       }
-      .matrix-cell .m-reg {
-        font-size: 10px;
-        color: #64748b;
+      .form-group label {
         display: block;
-      }
-      .matrix-cell.active .m-reg {
-        color: #166534;
-      }
-      .matrix-cell .m-val {
-        font-size: 13px;
         font-weight: bold;
+        margin-bottom: 4px;
+        font-size: 0.9em;
       }
-
-      .tooltip {
-        visibility: hidden;
-        background-color: #1e293b;
-        color: #fff;
-        text-align: left;
-        border-radius: 6px;
-        padding: 8px;
-        position: absolute;
-        z-index: 100;
-        top: 105%;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 160px;
-        font-size: 11px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        opacity: 0;
-        transition: opacity 0.1s;
-        pointer-events: none;
-      }
-      .matrix-cell:hover .tooltip {
-        visibility: visible;
-        opacity: 1;
-      }
-
-      .pagination-bar {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        margin-top: 10px;
-        font-size: 13px;
-        color: #475569;
-        flex-wrap: wrap;
-      }
-      .page-btn {
-        background: #fff;
-        border: 1px solid #cbd5e1;
-        padding: 5px 10px;
+      .form-group input {
+        width: 100%;
+        padding: 6px;
+        box-sizing: border-box;
+        border: 1px solid #ccc;
         border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
       }
-      .page-btn.active {
-        background: #2563eb;
-        color: white;
-        border-color: #2563eb;
+      .write-row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 6px;
+        align-items: center;
       }
-
-      .diff-old {
-        color: #dc2626;
-        text-decoration: line-through;
-        margin-right: 5px;
-      }
-      .diff-new {
-        color: #16a34a;
-        font-weight: bold;
+      .write-row input {
+        flex: 1;
       }
     </style>
   </head>
   <body>
-    <div class="container">
-      <header>
-        <div>
-          <h1>Modbus RTU Bus-Monitor & Matrix</h1>
-          <span id="status" style="color: #7f8c8d; font-size: 13px"
-            >Verbinde...</span
-          >
-        </div>
-        <div>
-          <button class="btn btn-clear" onclick="clearData()">
-            Daten zurücksetzen
-          </button>
-          <button class="btn" onclick="exportCSV()">CSV Export</button>
-        </div>
-      </header>
+    <h1>Modbus RTU Sniffer (Live)</h1>
 
-      <!-- NAVIGATION TABS -->
-      <div class="nav-tabs">
-        <button class="tab-btn active" onclick="switchView('log')">
-          1. Live Bus-Log
-        </button>
-        <button class="tab-btn" onclick="switchView('matrix')">
-          2. Matrix
-        </button>
-        <button class="tab-btn" onclick="switchView('trend')">3. Trend</button>
-        <button class="tab-btn" onclick="switchView('diff')">4. Diff</button>
-        <button class="tab-btn" onclick="switchView('devices')">
-          🖥️ Geräte
-        </button>
-        <button class="tab-btn" onclick="switchView('stats')">
-          📊 Statistik
-        </button>
-        <button class="tab-btn" onclick="switchView('decoder')">
-          🔍 Decoder
-        </button>
-        <button class="tab-btn" onclick="switchView('errors')">
-          ⚠️ Fehler
+    <div class="card">
+      <h2>Steuerung & Status</h2>
+      <div id="statusIndicator" class="status-box status-offline">
+        Verbindungsstatus: Getrennt
+      </div>
+      <div style="margin-top: 10px">
+        <button class="btn-start" onclick="startSniffer()">Start</button>
+        <button class="btn-stop" onclick="stopSniffer()">Stop</button>
+        <button
+          class="btn-clear"
+          onclick="clearData()"
+          style="margin-left: 10px"
+        >
+          Daten zurücksetzen
         </button>
       </div>
-
-      <!-- ANSICHT 1: LIVE LOG -->
-      <div id="view-log" class="view-section active">
-        <div class="info-box">
-          <strong>Live-Modus:</strong> Zeigt Telegramme inkl. Datum/Uhrzeit in
-          lokaler Zeitzone.
-        </div>
-        <div class="controls-bar">
-          <label
-            >Funktion-Filter:
-            <select id="funcFilter" onchange="renderLog()">
-              <option value="all">Alle Funktionen</option>
-            </select>
-          </label>
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Datum & Zeit</th>
-              <th>Slave</th>
-              <th>Befehl</th>
-              <th>Anfrage (Master)</th>
-              <th>Antwort & Register-Werte</th>
-            </tr>
-          </thead>
-          <tbody id="dataTable">
-            <tr>
-              <td colspan="5" style="text-align: center">
-                Lausche auf dem Bus...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- ANSICHT 2: REGISTER MATRIX -->
-      <div id="view-matrix" class="view-section">
-        <div class="info-box">
-          <strong>Register-Matrix:</strong> Blockansicht der aktuellen
-          Registerwerte pro Slave.
-        </div>
-        <div class="controls-bar">
-          <label
-            >Slave-ID Filter:
-            <select id="slaveFilter" onchange="renderMatrix()">
-              <option value="all">Alle Slaves</option>
-            </select>
-          </label>
-          <span
-            id="activeCount"
-            style="font-size: 13px; color: #64748b; margin-left: auto"
-            >Aktive Register: 0</span
-          >
-        </div>
-        <div id="paginationBar" class="pagination-bar"></div>
-        <div
-          id="matrixContainer"
-          class="matrix-container"
-          style="margin-top: 10px"
-        ></div>
-      </div>
-
-      <!-- ANSICHT 3: LIVE TREND (CHART) -->
-      <div id="view-trend" class="view-section">
-        <div class="info-box">
-          <strong>Register-Live-Trend:</strong> Komma-getrennt Register eingeben
-          (z. B. <code>100, 102</code>).
-        </div>
-        <div class="controls-bar">
-          <label
-            >Register:
-            <input
-              type="text"
-              id="trendRegInput"
-              placeholder="z.B. 100, 102"
-              style="width: 200px"
-            />
-          </label>
-          <button class="btn" onclick="updateChartConfig()">
-            Chart aktualisieren
-          </button>
-        </div>
-        <div
+      <div
+        style="margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px"
+      >
+        <button class="btn-backup" onclick="location.href = '/api/backup'">
+          Mapping Backup herunterladen
+        </button>
+        <label
+          class="btn-backup"
           style="
-            background: #fff;
-            padding: 15px;
-            border-radius: 6px;
-            border: 1px solid #cbd5e1;
-            height: 450px;
-            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            margin-left: 10px;
+            padding: 8px 14px;
           "
         >
-          <canvas id="trendChart"></canvas>
-        </div>
+          Mapping wiederherstellen
+          <input
+            type="file"
+            id="restoreFile"
+            style="display: none"
+            onchange="uploadBackup(event)"
+          />
+        </label>
       </div>
+    </div>
 
-      <!-- ANSICHT 4: ÄNDERUNGS-MONITOR (DIFF) -->
-      <div id="view-diff" class="view-section">
-        <div class="info-box">
-          <strong>Änderungs-Monitor (Diff):</strong> Zeigt ausschließlich
-          Register an, deren Werte sich geändert haben.
-        </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Zeit</th>
-              <th>Slave ID</th>
-              <th>Register</th>
-              <th>Art / Quelle</th>
-              <th>Änderung (Vorher ➔ Neu)</th>
-            </tr>
-          </thead>
-          <tbody id="diffTable">
-            <tr>
-              <td colspan="5" style="text-align: center">
-                Warte auf Register-Änderungen...
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+    <div class="card">
+      <h2>Live Feed (Transaktionen)</h2>
+      <div class="log-box" id="logBox">Warte auf Modbus-Daten...</div>
+    </div>
 
-      <!-- ANSICHT 5: GERÄTE (STATUS) -->
-      <div id="view-devices" class="view-section">
-        <div class="info-box">
-          <strong>Geräte-Status:</strong> Erkannte Slaves, Anzahl empfangener
-          Register sowie Zeitpunkt der letzten Aktivität.
-        </div>
-        <div id="deviceCardGrid" class="card-grid">
-          <div style="color: #64748b">Keine Slaves erkannt...</div>
-        </div>
-      </div>
+    <div class="card">
+      <h2>Erfasste Register & Mappings</h2>
+      <table id="registerTable">
+        <thead>
+          <tr>
+            <th>Key</th>
+            <th>Name / Label</th>
+            <th>Register</th>
+            <th>Aktuell / Letzter Write</th>
+            <th>Mögliche Writes / Bedeutungen</th>
+            <th>Einheit</th>
+            <th>Faktor</th>
+            <th>Aktion</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
 
-      <!-- ANSICHT 6: STATISTIK -->
-      <div id="view-stats" class="view-section">
-        <div class="info-box">
-          <strong>Bus-Statistik:</strong> Auswertung der Telegramm-Volumen,
-          Funktionsaufrufe und Fehlerhäufigkeit.
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal()">&times;</span>
+        <h2 id="modalTitle">Register bearbeiten</h2>
+        <input type="hidden" id="modalRegKey" />
+
+        <div class="form-group">
+          <label>Name / Label:</label>
+          <input type="text" id="modalName" />
         </div>
-        <div class="card-grid">
-          <div class="dashboard-card">
-            <h3>Gesamt-Metriken</h3>
-            <p>Gesamte Telegramme: <b id="statTotalTx">0</b></p>
-            <p>
-              Gesamte Fehler:
-              <b id="statTotalErrors" style="color: #dc2626">0</b>
-            </p>
-            <p>Fehlerquote: <b id="statErrorRate">0.0%</b></p>
+
+        <div style="display: flex; gap: 10px">
+          <div class="form-group" style="flex: 1">
+            <label>Einheit:</label>
+            <input type="text" id="modalUnit" />
           </div>
-          <div class="dashboard-card">
-            <h3>Top Funktionscodes</h3>
-            <div id="statFuncBreakdown" style="font-size: 13px">
-              Keine Daten
-            </div>
+          <div class="form-group" style="flex: 1">
+            <label>Faktor (Multiplier):</label>
+            <input type="number" step="any" id="modalMultiplier" />
           </div>
         </div>
-      </div>
 
-      <!-- ANSICHT 7: TELEGRAMM-DECODER -->
-      <div id="view-decoder" class="view-section">
-        <div class="info-box">
-          <strong>Manueller Telegramm-Decoder:</strong> Füge hier einen
-          Modbus-Hex-String (z.B. <code>01 03 04 00 00 00 00 FA 33</code>) ein,
-          um ihn aufzuschlüsseln.
-        </div>
-        <div
-          class="controls-bar"
-          style="flex-direction: column; align-items: stretch"
-        >
-          <textarea
-            id="decoderInput"
-            rows="3"
-            placeholder="Hex-Bytes hier einfügen (z.B. 01 03 04 00 2A 01 B4 ...)"
-          ></textarea>
-          <div>
-            <button class="btn" onclick="decodeCustomHex()">
-              Hex decodieren
-            </button>
-          </div>
-        </div>
-        <div
-          id="decoderResult"
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #eee" />
+
+        <h3>Write-Mappings (Bedeutungen der Werte)</h3>
+        <p style="font-size: 0.8em; color: #666">
+          Definiere, welche Bedeutung spezifische geschriebene Werte haben.
+        </p>
+
+        <div id="modalWriteLabelsContainer"></div>
+
+        <button
+          type="button"
+          onclick="addWriteRow()"
           style="
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            padding: 15px;
-            border-radius: 6px;
-            margin-top: 10px;
-            font-size: 13px;
+            background: #27ae60;
+            color: white;
+            margin-top: 8px;
+            padding: 6px 10px;
+            font-size: 0.85em;
           "
         >
-          Noch kein Telegramm analysiert.
-        </div>
-      </div>
+          + Write-Wert hinzufügen
+        </button>
 
-      <!-- ANSICHT 8: FEHLER-MONITOR -->
-      <div id="view-errors" class="view-section">
-        <div class="info-box">
-          <strong>Fehler-Log:</strong> Listet Timeout-Fehler, CRC-Fehler oder
-          Modbus Exception Responses auf.
+        <div style="margin-top: 25px; text-align: right">
+          <button
+            type="button"
+            onclick="closeModal()"
+            style="background: #7f8c8d; color: white; margin-right: 8px"
+          >
+            Abbrechen
+          </button>
+          <button
+            type="button"
+            onclick="saveModalChanges()"
+            style="background: #27ae60; color: white"
+          >
+            Speichern
+          </button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Zeit</th>
-              <th>Slave ID</th>
-              <th>Fehlertyp</th>
-              <th>Details / Rohdaten</th>
-            </tr>
-          </thead>
-          <tbody id="errorTable">
-            <tr>
-              <td colspan="4" style="text-align: center">
-                Keine Fehler auf dem Bus verzeichnet. Alles stabil!
-              </td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script>
       const socket = io();
-      let globalData = { transactions: [], registers: [], errors: [] };
-      let currentView = "log";
-      let currentMatrixPage = 0;
-      let updatePending = false;
-
-      const previousRegisterValues = new Map();
-      let diffLogList = [];
-
-      let trendChartInstance = null;
-      let monitoredRegisters = [];
-
-      const statusEl = document.getElementById("status");
-      const dataTableEl = document.getElementById("dataTable");
-      const matrixContainerEl = document.getElementById("matrixContainer");
-      const slaveFilterEl = document.getElementById("slaveFilter");
-      const funcFilterEl = document.getElementById("funcFilter");
-      const activeCountEl = document.getElementById("activeCount");
-      const paginationBarEl = document.getElementById("paginationBar");
-      const diffTableEl = document.getElementById("diffTable");
-
-      function formatLocalDateTime(isoString) {
-        if (!isoString) return "-";
-        const date = new Date(isoString);
-        if (isNaN(date.getTime())) return isoString;
-        return date.toLocaleString("de-DE", {
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          fractionalSecondDigits: 3,
-        });
-      }
-
-      socket.on("connect", () => {
-        statusEl.textContent = "Verbunden (Live)";
-        statusEl.style.color = "#27ae60";
-      });
-
-      socket.on("disconnect", () => {
-        statusEl.textContent = "Verbindung getrennt";
-        statusEl.style.color = "#c0392b";
-      });
+      let currentRegisters = {};
+      let activePopupSlaveReg = null;
 
       socket.on("updateData", (data) => {
-        processIncomingDiffs(data);
-        globalData = data;
-        if (!updatePending) {
-          updatePending = true;
-          requestAnimationFrame(() => {
-            renderCurrentView();
-            updateChartData();
-            updatePending = false;
-          });
+        currentRegisters = data.registers || {};
+
+        const statusEl = document.getElementById("statusIndicator");
+        if (data.isConnected) {
+          statusEl.className = "status-box status-online";
+          statusEl.innerText = `Verbunden mit Gateway (${data.isRunning ? "Sniffer Aktiv" : "Sniffer Pausiert"})`;
+        } else {
+          statusEl.className = "status-box status-offline";
+          statusEl.innerText =
+            "Verbindung zum USR-Gateway getrennt (Versuche Reconnect...)";
+        }
+
+        const logBox = document.getElementById("logBox");
+        if (data.transactions && data.transactions.length > 0) {
+          logBox.innerHTML = data.transactions
+            .map((tx) => {
+              const time = new Date(tx.timestamp).toLocaleTimeString();
+              return `[${time}] [Slave: ${tx.slaveId}] [${tx.type}] ${tx.funcName} (Reg: ${tx.startReg}) -> Raw: ${tx.raw}`;
+            })
+            .join("<br>");
+        } else {
+          logBox.innerHTML = "Keine Transaktionen aufgezeichnet.";
+        }
+
+        const tbody = document.querySelector("#registerTable tbody");
+        tbody.innerHTML = "";
+
+        for (const key in currentRegisters) {
+          const reg = currentRegisters[key];
+          const labels = reg.labels || {
+            name: `Reg ${reg.regNum}`,
+            unit: "",
+            multiplier: 1,
+          };
+
+          let valDisplay = `Aktuell: ${reg.currentValue !== undefined ? reg.currentValue : "-"}`;
+          if (reg.lastWrittenValue !== undefined) {
+            let writeMeaning =
+              reg.writeLabels && reg.writeLabels[reg.lastWrittenValue]
+                ? ` (${reg.writeLabels[reg.lastWrittenValue]})`
+                : "";
+            valDisplay += `<br><small style="color: #e67e22;">Letzter Write: <b>${reg.lastWrittenValue}</b>${writeMeaning}</small>`;
+          }
+
+          let writeLabelsHtml = "-";
+          if (reg.writeLabels && Object.keys(reg.writeLabels).length > 0) {
+            writeLabelsHtml = Object.entries(reg.writeLabels)
+              .map(([val, meaning]) => {
+                return `<span class="write-badge"><b>${val}</b>: ${meaning}</span>`;
+              })
+              .join(" ");
+          }
+
+          tbody.innerHTML += `
+                    <tr>
+                        <td>${key}</td>
+                        <td><b>${labels.name || ""}</b></td>
+                        <td>${reg.regNum}</td>
+                        <td>${valDisplay}</td>
+                        <td>${writeLabelsHtml}</td>
+                        <td>${labels.unit || ""}</td>
+                        <td>${labels.multiplier || 1}</td>
+                        <td><button class="btn-edit" onclick="openModal('${key}')">Bearbeiten</button></td>
+                    </tr>
+                `;
         }
       });
 
-      function processIncomingDiffs(data) {
-        const now = new Date().toISOString();
-        const writeFuncCodes = [5, 6, 15, 16];
-        let latestTx =
-          data.transactions && data.transactions.length > 0
-            ? data.transactions[data.transactions.length - 1]
-            : null;
-        let isWriteOperation =
-          latestTx && writeFuncCodes.includes(Number(latestTx.funcCode));
+      // Modal öffnen und Daten befüllen
+      function openModal(regKey) {
+        const reg = currentRegisters[regKey];
+        if (!reg) return;
 
-        if (data.registers) {
-          data.registers.forEach((reg) => {
-            const key = `${reg.slaveId}-${reg.regNum}`;
-            const oldVal = previousRegisterValues.get(key);
+        document.getElementById("modalRegKey").value = regKey;
+        document.getElementById("modalTitle").innerText =
+          `Register ${reg.slaveId}-${reg.regNum} bearbeiten`;
+        document.getElementById("modalName").value = reg.labels
+          ? reg.labels.name || ""
+          : "";
+        document.getElementById("modalUnit").value = reg.labels
+          ? reg.labels.unit || ""
+          : "";
+        document.getElementById("modalMultiplier").value = reg.labels
+          ? reg.labels.multiplier || 1
+          : 1;
 
-            if (oldVal !== undefined && oldVal !== reg.raw) {
-              let sourceOrigin = "Prozess (Read)";
-              let badgeClass = "badge-read";
+        const container = document.getElementById("modalWriteLabelsContainer");
+        container.innerHTML = "";
 
-              if (isWriteOperation && latestTx) {
-                const startR = latestTx.startReg;
-                const countR = latestTx.countOrVal || 1;
-                if (
-                  reg.slaveId === latestTx.slaveId &&
-                  reg.regNum >= startR &&
-                  reg.regNum < startR + countR
-                ) {
-                  sourceOrigin = `Schreibbefehl (FC 0${latestTx.funcCode} - ${
-                    latestTx.funcName || "Write"
-                  })`;
-                  badgeClass = "badge-write";
-                }
-              }
-
-              diffLogList.unshift({
-                timestamp: now,
-                slaveId: reg.slaveId,
-                regNum: reg.regNum,
-                oldVal: oldVal,
-                newVal: reg.raw,
-                source: sourceOrigin,
-                badgeClass: badgeClass,
-              });
-              if (diffLogList.length > 100) diffLogList.pop();
-            }
-            previousRegisterValues.set(key, reg.raw);
-          });
+        if (reg.writeLabels) {
+          for (const [val, meaning] of Object.entries(reg.writeLabels)) {
+            addWriteRow(val, meaning);
+          }
         }
+
+        document.getElementById("editModal").style.display = "block";
       }
 
-      function switchView(viewName) {
-        currentView = viewName;
-        document
-          .querySelectorAll(".tab-btn")
-          .forEach((btn) => btn.classList.remove("active"));
-        document
-          .querySelectorAll(".view-section")
-          .forEach((sec) => sec.classList.remove("active"));
+      function closeModal() {
+        document.getElementById("editModal").style.display = "none";
+      }
 
-        const tabMapping = {
-          log: 0,
-          matrix: 1,
-          trend: 2,
-          diff: 3,
-          devices: 4,
-          stats: 5,
-          decoder: 6,
-          errors: 7,
+      // Dynamische Zeile für Write-Werte im Modal hinzufügen
+      function addWriteRow(val = "", meaning = "") {
+        const container = document.getElementById("modalWriteLabelsContainer");
+        const row = document.createElement("div");
+        row.className = "write-row";
+        row.innerHTML = `
+                <input type="text" class="w-val" placeholder="Wert (z.B. 57343)" value="${val}">
+                <input type="text" class="w-meaning" placeholder="Bedeutung (z.B. quittieren)" value="${meaning}">
+                <button type="button" onclick="this.parentElement.remove()" style="background: #e74c3c; color: white; padding: 6px 10px;">X</button>
+            `;
+        container.appendChild(row);
+      }
+
+      // Änderungen aus dem Modal speichern
+      function saveModalChanges() {
+        const regKey = document.getElementById("modalRegKey").value;
+        const name = document.getElementById("modalName").value;
+        const unit = document.getElementById("modalUnit").value;
+        const multiplier = document.getElementById("modalMultiplier").value;
+
+        // Write-Labels aus den dynamischen Zeilen einsammeln
+        const writeLabels = {};
+        const rows = document.querySelectorAll(
+          "#modalWriteLabelsContainer .write-row",
+        );
+        rows.forEach((row) => {
+          const val = row.querySelector(".w-val").value.trim();
+          const meaning = row.querySelector(".w-meaning").value.trim();
+          if (val !== "") {
+            writeLabels[val] = meaning;
+          }
+        });
+
+        socket.emit("updateRegisterMapping", {
+          regKey,
+          name,
+          unit,
+          multiplier,
+          writeLabels,
+        });
+
+        closeModal();
+      }
+
+      // Klick außerhalb des Modals schließt dieses ebenfalls
+      window.onclick = function (event) {
+        const modal = document.getElementById("editModal");
+        if (event.target === modal) {
+          closeModal();
+        }
+      };
+
+      socket.on("writePopup", (data) => {
+        const popupKey = `${data.slaveId}-${data.startReg}-${data.value}`;
+        if (activePopupSlaveReg === popupKey) return;
+        activePopupSlaveReg = popupKey;
+
+        const regKey = `${data.slaveId}-${data.startReg}`;
+        const existing = currentRegisters[regKey] || {};
+        const currentLabels = existing.labels || {
+          name: `Reg ${data.startReg}`,
+          unit: "",
+          multiplier: 1,
         };
 
-        const idx = tabMapping[viewName];
-        if (idx !== undefined) {
-          document.querySelectorAll(".tab-btn")[idx].classList.add("active");
-        }
-        document.getElementById(`view-${viewName}`).classList.add("active");
-
-        renderCurrentView();
-      }
-
-      function renderCurrentView() {
-        if (currentView === "log") {
-          updateFuncFilterOptions();
-          renderLog();
-        } else if (currentView === "matrix") {
-          updateSlaveFilterOptions();
-          renderMatrix();
-        } else if (currentView === "diff") {
-          renderDiffLog();
-        } else if (currentView === "devices") {
-          renderDevices();
-        } else if (currentView === "stats") {
-          renderStats();
-        } else if (currentView === "trend") {
-          initChartInstance();
-        } else if (currentView === "errors") {
-          renderErrors();
-        }
-      }
-
-      function updateFuncFilterOptions() {
-        const txs = globalData.transactions || [];
-        const funcs = [
-          ...new Map(txs.map((t) => [t.funcCode, t.funcName])).entries(),
-        ];
-        const currentVal = funcFilterEl.value;
-        let options = '<option value="all">Alle Funktionen</option>';
-        funcs.forEach(([code, name]) => {
-          options += `<option value="${code}">FC 0${code} - ${
-            name || "Unbekannt"
-          }</option>`;
-        });
-        funcFilterEl.innerHTML = options;
-        if ([...funcFilterEl.options].some((o) => o.value === currentVal)) {
-          funcFilterEl.value = currentVal;
-        }
-      }
-
-      function renderLog() {
-        const selectedFunc = funcFilterEl.value;
-        let txList = globalData.transactions || [];
-        if (selectedFunc !== "all") {
-          txList = txList.filter((t) => t.funcCode == selectedFunc);
-        }
-        if (txList.length === 0) {
-          dataTableEl.innerHTML = `<tr><td colspan="5" style="text-align: center;">Keine Telegramme vorhanden...</td></tr>`;
-          return;
-        }
-
-        let html = "";
-        txList
-          .slice(-100)
-          .reverse()
-          .forEach((tx) => {
-            let valuesHtml =
-              '<span style="color: #e67e22;">Warte auf Antwort...</span>';
-            if (
-              Array.isArray(tx.decodedValues) &&
-              tx.decodedValues.length > 0
-            ) {
-              valuesHtml = '<div class="register-grid">';
-              tx.decodedValues.forEach((v, idx) => {
-                const currentReg =
-                  typeof tx.startReg === "number" ? tx.startReg + idx : "?";
-                valuesHtml += `<div class="register-box">
-                    <span class="reg-num">Reg ${currentReg}</span>
-                    <div class="val-row">16b: <span class="val-highlight">${v.raw}</span> <small>(${v.signed})</small></div>`;
-                if (v.uint32_ABCD !== null) {
-                  valuesHtml += `<div class="val-row">32i: <b>${v.uint32_ABCD}</b></div>
-                        <div class="val-row">Flt: <b style="color:#16a34a">${v.float_ABCD}</b></div>`;
-                }
-                valuesHtml += `</div>`;
-              });
-              valuesHtml += "</div>";
-            } else if (typeof tx.decodedValues === "string") {
-              valuesHtml = tx.decodedValues;
-            }
-
-            html += `<tr>
-                <td>${formatLocalDateTime(tx.timestamp)}</td>
-                <td><strong>ID ${tx.slaveId}</strong></td>
-                <td><span class="badge badge-fc3">FC 0${tx.funcCode}</span><br><small>${tx.funcName}</small></td>
-                <td>Start: <b>${tx.startReg}</b><br>Anzahl: <b>${tx.countOrVal}</b></td>
-                <td>${valuesHtml}<small style="color: #94a3b8; display:block; margin-top:5px;">Hex: <code>${
-                  tx.responseRaw || "-"
-                }</code></small></td>
-              </tr>`;
-          });
-        dataTableEl.innerHTML = html;
-      }
-
-      function updateSlaveFilterOptions() {
-        const regs = globalData.registers || [];
-        const slaves = [...new Set(regs.map((r) => r.slaveId))];
-        const currentVal = slaveFilterEl.value;
-        let options = '<option value="all">Alle Slaves</option>';
-        slaves.forEach((s) => {
-          options += `<option value="${s}">Slave ID ${s}</option>`;
-        });
-        slaveFilterEl.innerHTML = options;
-        slaveFilterEl.value = slaves.includes(Number(currentVal))
-          ? currentVal
-          : "all";
-      }
-
-      function renderMatrix() {
-        const selectedSlave = slaveFilterEl.value;
-        let regs = globalData.registers || [];
-        if (selectedSlave !== "all") {
-          regs = regs.filter((r) => r.slaveId == selectedSlave);
-        }
-        activeCountEl.textContent = `Aktive Register gesamt: ${regs.length}`;
-        if (regs.length === 0) {
-          paginationBarEl.innerHTML = "";
-          matrixContainerEl.innerHTML = `<div style="grid-column: 1 / -1; text-align:center; padding: 30px; color: #64748b;">Noch keine Register in dieser Ansicht aktiv...</div>`;
-          return;
-        }
-
-        const maxActiveReg = Math.max(...regs.map((r) => r.regNum));
-        const maxPage = Math.floor(maxActiveReg / 1000);
-        if (currentMatrixPage > maxPage) currentMatrixPage = 0;
-
-        let paginationHtml =
-          '<span style="font-weight: bold; margin-right: 5px;">Bereiche:</span>';
-        for (let p = 0; p <= maxPage; p++) {
-          const startRange = p * 1000;
-          const endRange = startRange + 999;
-          const countInBlock = regs.filter(
-            (r) => r.regNum >= startRange && r.regNum <= endRange,
-          ).length;
-          const activeClass =
-            p === currentMatrixPage ? "page-btn active" : "page-btn";
-          paginationHtml += `<button class="${activeClass}" onclick="setMatrixPage(${p})">${startRange}-${endRange} <small>(${countInBlock})</small></button>`;
-        }
-        paginationBarEl.innerHTML = paginationHtml;
-
-        const startReg = currentMatrixPage * 1000;
-        const endReg = startReg + 999;
-        const activeMap = new Map();
-        regs.forEach((r) => activeMap.set(`${r.slaveId}-${r.regNum}`, r));
-
-        let html = "";
-        const targetSlave =
-          selectedSlave === "all"
-            ? regs[0]
-              ? regs[0].slaveId
-              : 1
-            : Number(selectedSlave);
-
-        for (let i = startReg; i <= endReg; i++) {
-          const key = `${targetSlave}-${i}`;
-          const regData = activeMap.get(key);
-          const isActive = !!regData;
-          let cellClass = "matrix-cell" + (isActive ? " active" : "");
-          let displayVal = isActive ? regData.raw : "-";
-
-          html += `<div class="${cellClass}"><span class="m-reg">R:${i}</span><span class="m-val">${displayVal}</span>`;
-          if (isActive) {
-            html += `<div class="tooltip"><b>Reg ${i} (ID ${targetSlave})</b><br>16b: ${regData.raw} (${regData.signed})<br><small>${formatLocalDateTime(
-              regData.timestamp,
-            )}</small></div>`;
-          }
-          html += `</div>`;
-        }
-        matrixContainerEl.innerHTML = html;
-      }
-
-      function setMatrixPage(page) {
-        currentMatrixPage = page;
-        renderMatrix();
-      }
-
-      function renderDiffLog() {
-        if (diffLogList.length === 0) {
-          diffTableEl.innerHTML = `<tr><td colspan="5" style="text-align: center;">Noch keine Wertänderungen erkannt...</td></tr>`;
-          return;
-        }
-        let html = "";
-        diffLogList.forEach((item) => {
-          html += `<tr>
-                <td>${formatLocalDateTime(item.timestamp)}</td>
-                <td><strong>ID ${item.slaveId}</strong></td>
-                <td>Reg ${item.regNum}</td>
-                <td><span class="badge ${item.badgeClass}">${
-                  item.source
-                }</span></td>
-                <td><span class="diff-old">${item.oldVal}</span> ➔ <span class="diff-new">${item.newVal}</span></td>
-              </tr>`;
-        });
-        diffTableEl.innerHTML = html;
-      }
-
-      // --- NEUE ANSICHT 5: GERÄTE (STATUS) ---
-      function renderDevices() {
-        const container = document.getElementById("deviceCardGrid");
-        const regs = globalData.registers || [];
-        const txs = globalData.transactions || [];
-
-        // Finde alle eindeutigen Slave-IDs aus Registern und Transaktionen
-        const slaveIds = [
-          ...new Set([
-            ...regs.map((r) => r.slaveId),
-            ...txs.map((t) => t.slaveId),
-          ]),
-        ].sort((a, b) => a - b);
-
-        if (slaveIds.length === 0) {
-          container.innerHTML = `<div style="color: #64748b;">Noch keine Modbus-Slaves auf dem Bus entdeckt.</div>`;
-          return;
-        }
-
-        let html = "";
-        slaveIds.forEach((id) => {
-          const deviceRegs = regs.filter((r) => r.slaveId === id);
-          const deviceTxs = txs.filter((t) => t.slaveId === id);
-          const lastTx =
-            deviceTxs.length > 0 ? deviceTxs[deviceTxs.length - 1] : null;
-          const lastTime = lastTx ? formatLocalDateTime(lastTx.timestamp) : "-";
-
-          html += `
-            <div class="dashboard-card">
-              <h3>Slave ID ${id}</h3>
-              <p><strong>Status:</strong> <span class="badge badge-ok">Online</span></p>
-              <p>Aktive Register im Cache: <b>${deviceRegs.length}</b></p>
-              <p>Gesendete Telegramme: <b>${deviceTxs.length}</b></p>
-              <p><small style="color: #64748b;">Letzte Aktivität: ${lastTime}</small></p>
-            </div>
-          `;
-        });
-        container.innerHTML = html;
-      }
-
-      // --- NEUE ANSICHT 6: STATISTIK ---
-      function renderStats() {
-        const txs = globalData.transactions || [];
-        const errs = globalData.errors || [];
-        const totalTx = txs.length;
-        const totalErr = errs.length;
-        const errorRate =
-          totalTx > 0
-            ? ((totalErr / (totalTx + totalErr)) * 100).toFixed(1)
-            : 0;
-
-        document.getElementById("statTotalTx").textContent = totalTx;
-        document.getElementById("statTotalErrors").textContent = totalErr;
-        document.getElementById("statErrorRate").textContent = errorRate + "%";
-
-        // Funktions-Breakdown zählen
-        const funcCounts = {};
-        txs.forEach((t) => {
-          const key = `FC 0${t.funcCode} (${t.funcName || "Unbekannt"})`;
-          funcCounts[key] = (funcCounts[key] || 0) + 1;
-        });
-
-        const breakdownEl = document.getElementById("statFuncBreakdown");
-        const keys = Object.keys(funcCounts);
-        if (keys.length === 0) {
-          breakdownEl.innerHTML = "Keine Daten vorhanden";
-          return;
-        }
-
-        let bHtml = "";
-        keys.forEach((k) => {
-          bHtml += `<div>${k}: <b>${funcCounts[k]}x</b></div>`;
-        });
-        breakdownEl.innerHTML = bHtml;
-      }
-
-      // --- NEUE ANSICHT 7: TELEGRAMM-DECODER ---
-      function decodeCustomHex() {
-        const rawText = document.getElementById("decoderInput").value.trim();
-        const resultEl = document.getElementById("decoderResult");
-        if (!rawText) {
-          resultEl.innerHTML = "Bitte gib einen gültigen Hex-String ein.";
-          return;
-        }
-
-        // Bereinige Leerzeichen
-        const cleanHex = rawText.replace(/\s+/g, "");
-        if (cleanHex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(cleanHex)) {
-          resultEl.innerHTML =
-            "<span style='color:#dc2626;'>Fehler: Ungültiges Hex-Format.</span>";
-          return;
-        }
-
-        const bytes = [];
-        for (let i = 0; i < cleanHex.length; i += 2) {
-          bytes.push(parseInt(cleanHex.substr(i, 2), 16));
-        }
-
-        if (bytes.length < 2) {
-          resultEl.innerHTML =
-            "<span style='color:#dc2626;'>Telegramm zu kurz. Mindestens Slave-ID und Function Code erforderlich.</span>";
-          return;
-        }
-
-        const slaveId = bytes[0];
-        const funcCode = bytes[1];
-        let desc = `<strong>Slave ID:</strong> ${slaveId}<br>`;
-        desc += `<strong>Function Code:</strong> FC 0${funcCode}<br>`;
-        desc += `<strong>Gesamtlänge:</strong> ${bytes.length} Bytes<br><br>`;
-        desc += `<strong>Payload Bytes:</strong> <code>${bytes
-          .slice(2)
-          .map((b) => b.toString(16).padStart(2, "0").toUpperCase())
-          .join(" ")}</code>`;
-
-        resultEl.innerHTML = desc;
-      }
-
-      // --- NEUE ANSICHT 8: FEHLER-MONITOR ---
-      function renderErrors() {
-        const errorTableEl = document.getElementById("errorTable");
-        const errs = globalData.errors || [];
-
-        if (errs.length === 0) {
-          errorTableEl.innerHTML = `<tr><td colspan="4" style="text-align: center;">Keine Fehler auf dem Bus verzeichnet. Alles stabil!</td></tr>`;
-          return;
-        }
-
-        let html = "";
-        errs
-          .slice(-50)
-          .reverse()
-          .forEach((e) => {
-            html += `<tr>
-              <td>${formatLocalDateTime(e.timestamp)}</td>
-              <td><strong>ID ${e.slaveId || "-"}</strong></td>
-              <td><span class="badge badge-error">${
-                e.errorType || "Timeout / CRC"
-              }</span></td>
-              <td><code>${e.details || "-"}</code></td>
-            </tr>`;
-          });
-        errorTableEl.innerHTML = html;
-      }
-
-      // --- Chart.js Logik ---
-      function initChartInstance() {
-        if (trendChartInstance) return;
-        const ctx = document.getElementById("trendChart").getContext("2d");
-        trendChartInstance = new Chart(ctx, {
-          type: "line",
-          data: { labels: [], datasets: [] },
-          options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            animation: false,
-            scales: {
-              x: { title: { display: true, text: "Zeit" } },
-              y: { title: { display: true, text: "Register Rohwert" } },
-            },
-          },
-        });
-      }
-
-      function updateChartConfig() {
-        const inputVal = document.getElementById("trendRegInput").value;
-        monitoredRegisters = inputVal
-          .split(",")
-          .map((s) => parseInt(s.trim()))
-          .filter((n) => !isNaN(n));
-
-        if (!trendChartInstance) initChartInstance();
-
-        const colors = [
-          "#2563eb",
-          "#16a34a",
-          "#d97706",
-          "#9333ea",
-          "#dc2626",
-          "#0891b2",
-        ];
-        const datasets = monitoredRegisters.map((regNum, idx) => ({
-          label: `Reg ${regNum}`,
-          data: [],
-          borderColor: colors[idx % colors.length],
-          backgroundColor: colors[idx % colors.length],
-          borderWidth: 2,
-          tension: 0.1,
-          fill: false,
-        }));
-
-        trendChartInstance.data.datasets = datasets;
-        trendChartInstance.data.labels = [];
-        trendChartInstance.update();
-      }
-
-      function updateChartData() {
-        if (!trendChartInstance || monitoredRegisters.length === 0) return;
-
-        const timeLabel = new Date().toLocaleTimeString();
-        const maxDataPoints = 30;
-
-        trendChartInstance.data.labels.push(timeLabel);
-        if (trendChartInstance.data.labels.length > maxDataPoints) {
-          trendChartInstance.data.labels.shift();
-        }
-
-        const regMap = new Map();
-        (globalData.registers || []).forEach((r) =>
-          regMap.set(r.regNum, r.raw),
+        const funcNameInput = prompt(
+          `⚠️ Schreibvorgang erkannt!\n\nSlave: ${data.slaveId} | Register: ${data.startReg} | Wert: ${data.value}\n\n1. Welches Label/Funktion soll dieses Register haben?`,
+          currentLabels.name,
         );
 
-        trendChartInstance.data.datasets.forEach((dataset) => {
-          const regNum = parseInt(dataset.label.replace("Reg ", ""));
-          const val = regMap.has(regNum) ? regMap.get(regNum) : null;
-          dataset.data.push(val);
-          if (dataset.data.length > maxDataPoints) {
-            dataset.data.shift();
-          }
-        });
-
-        trendChartInstance.update("none");
-      }
-
-      function clearData() {
-        socket.emit("clear");
-        globalData = { transactions: [], registers: [], errors: [] };
-        previousRegisterValues.clear();
-        diffLogList = [];
-        currentMatrixPage = 0;
-        if (trendChartInstance) {
-          trendChartInstance.data.labels = [];
-          trendChartInstance.data.datasets.forEach((ds) => (ds.data = []));
-          trendChartInstance.update();
-        }
-        renderCurrentView();
-      }
-
-      function exportCSV() {
-        const txs = globalData.transactions || [];
-        if (txs.length === 0) {
-          alert("Keine Daten vorhanden.");
+        if (funcNameInput === null) {
+          activePopupSlaveReg = null;
           return;
         }
-        let csv =
-          "Timestamp,SlaveID,FunctionCode,StartRegister,Count,RawRequest,RawResponse\r\n";
-        txs.forEach((t) => {
-          csv += `"${t.timestamp}",${t.slaveId},${t.funcCode},${t.startReg},${
-            t.countOrVal
-          },"${t.requestRaw}","${t.responseRaw || ""}"\r\n`;
-        });
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `modbus_monitor_${new Date().toISOString().slice(0, 10)}.csv`;
-        link.click();
+
+        const valMeaningInput = prompt(
+          `2. Was bedeutet der geschriebene Wert "${data.value}"? (z.B. quittieren, EIN, AUS):`,
+          data.value,
+        );
+
+        if (valMeaningInput !== null) {
+          let writeLabels = existing.writeLabels || {};
+          writeLabels[data.value] = valMeaningInput.trim();
+
+          socket.emit("updateRegisterMapping", {
+            regKey: regKey,
+            name:
+              funcNameInput.trim() !== "" ? funcNameInput : currentLabels.name,
+            unit: currentLabels.unit || "",
+            multiplier: currentLabels.multiplier || 1,
+            writeLabels: writeLabels,
+          });
+        }
+
+        setTimeout(() => {
+          activePopupSlaveReg = null;
+        }, 1000);
+      });
+
+      function startSniffer() {
+        socket.emit("start");
+      }
+      function stopSniffer() {
+        socket.emit("stop");
+      }
+      function clearData() {
+        socket.emit("clear");
+      }
+
+      function uploadBackup(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const parsed = JSON.parse(e.target.result);
+            socket.emit("restoreMappings", parsed);
+            alert("Mappings erfolgreich wiederhergestellt!");
+          } catch (err) {
+            alert("Fehler beim Parsen der JSON-Datei.");
+          }
+        };
+        reader.readAsText(file);
       }
     </script>
   </body>
